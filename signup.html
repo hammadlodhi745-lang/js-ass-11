@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#121826">
+  <meta name="description" content="Create a Chatly account to access its contact list and messaging interface.">
+  <meta name="application-name" content="Chatly">
+  <title>Chatly — Sign up</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/pulse/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-dark text-light">
+  <div id="appShell" class="min-vh-100 d-flex flex-column">
+    <nav class="navbar navbar-dark bg-dark border-bottom border-secondary py-1">
+      <div class="container">
+        <a class="navbar-brand fw-semibold" href="index.html">
+          <i class="bi bi-chat-square-heart-fill text-primary me-2"></i>Chatly
+        </a>
+      </div>
+    </nav>
+
+    <main class="container flex-grow-1 d-flex align-items-center justify-content-center py-2">
+      <div class="row justify-content-center w-100">
+        <div class="col-12 col-sm-10 col-md-7 col-lg-5 col-xl-4">
+          <section class="card bg-body-secondary border-secondary shadow-lg">
+            <div class="card-body p-3">
+              <div class="text-center mb-3">
+                <h1 class="h4 fw-semibold mb-0">Create your account</h1>
+              </div>
+
+              <div id="authFeedback" class="alert d-none" role="status" aria-live="polite"></div>
+              <form id="signupForm">
+                <div class="mb-2">
+                  <label class="form-label small mb-1" for="fullName">Full name</label>
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <input class="form-control" id="fullName" type="text" placeholder="Your name" autocomplete="name"
+                      maxlength="60" required>
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1" for="signupEmail">Email address</label>
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                    <input class="form-control" id="signupEmail" type="email" placeholder="name@example.com"
+                      autocomplete="email" required>
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <label class="form-label small mb-1" for="signupPassword">Password</label>
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                    <input class="form-control" id="signupPassword" type="password" placeholder="At least 6 characters"
+                      autocomplete="new-password" minlength="6" required>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small mb-1" for="confirmPassword">Confirm password</label>
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-shield-lock"></i></span>
+                    <input class="form-control" id="confirmPassword" type="password" placeholder="Repeat your password"
+                      autocomplete="new-password" minlength="6" required>
+                  </div>
+                </div>
+                <button class="btn btn-primary w-100 py-2" type="submit">Create account</button>
+              </form>
+
+              <p class="text-center text-secondary small mt-3 mb-0">
+                Already have an account?
+                <a class="link-primary link-offset-2 ms-1" href="index.html">Login</a>
+              </p>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/auth.js"></script>
+</body>
+
+</html>
