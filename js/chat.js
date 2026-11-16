@@ -1,59 +1,33 @@
-const sampleUsers = [
-  { uid: "sample-awais", fullName: "Awais", online: true },
-  { uid: "sample-ali", fullName: "Ali", online: true },
-  { uid: "sample-shahzaib", fullName: "Shahzaib Lodhi", online: false },
-  { uid: "sample-farhan", fullName: "Farhan Malik", online: true },
-  { uid: "sample-hashir", fullName: "Hashir Lodhi", online: false }
-];
+import {
+  onChildAdded,
+  onDisconnect,
+  onValue,
+  push,
+  ref,
+  serverTimestamp,
+  set,
+  update
+} from "https://www.gstatic.com/firebasejs/13.3.0/firebase-database.js";
+import { setButtonLoading } from "./button-loading.js";
+import { database } from "./firebase.js";
 
 function initials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "?";
 }
 
-function createSampleConversations() {
-  return {
-    "sample-awais": [
-      { senderId: "sample-awais", text: "Assalamu alaikum! Kya haal hain?", time: "10:32 AM" },
-      { senderId: "me", text: "Wa alaikum assalam! Alhamdulillah, theek hoon. Aap sunao?", time: "10:34 AM" },
-      { senderId: "sample-awais", text: "Alhamdulillah, main bhi theek. Kal milte hain inshaAllah.", time: "10:35 AM" }
-    ],
-    "sample-ali": [
-      { senderId: "sample-ali", text: "Aaj ka assignment complete hua?", time: "9:18 AM" },
-      { senderId: "me", text: "Haan, bas final check kar raha hoon.", time: "9:20 AM" }
-    ],
-    "sample-shahzaib": [
-      { senderId: "sample-shahzaib", text: "Kal ka match dekh rahe ho?", time: "Yesterday" },
-      { senderId: "me", text: "Bilkul, plan confirm hai.", time: "Yesterday" }
-    ],
-    "sample-farhan": [
-      { senderId: "sample-farhan", text: "Family dinner ka plan 8 baje hai.", time: "Yesterday" },
-      { senderId: "me", text: "Theek hai, main time par pohanch jaunga.", time: "Yesterday" }
-    ],
-    "sample-hashir": [
-      { senderId: "sample-hashir", text: "Nayi book kaisi lag rahi hai?", time: "Yesterday" },
-      { senderId: "me", text: "Kaafi achi hai, finish karke bataunga.", time: "Yesterday" }
-    ]
-  };
+function formatTime(timestamp) {
+  const date = new Date(Number(timestamp));
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(date);
 }
 
-export function createChat(currentUser, registeredUsers = []) {
-  const users = [
-    ...sampleUsers,
-    ...registeredUsers
-      .filter((user) => user.uid !== currentUser.uid)
-      .map((user) => ({ ...user, online: false }))
-  ];
-  const storageKey = `chatly.messages.${currentUser.uid}`;
-  const savedConversations = localStorage.getItem(storageKey);
-  const conversations = savedConversations
-    ? JSON.parse(savedConversations)
-    : createSampleConversations();
+export function createChat(currentUser) {
+  let users = [];
+  const conversations = new Map();
   let activeUserId = null;
   let mobileView = "users";
-
-  if (!savedConversations) {
-    localStorage.setItem(storageKey, JSON.stringify(conversations));
-  }
+  let unsubscribeMessages = null;
+  let isSending = false;
 
   const usersPanel = document.querySelector("#usersPanel");
   const chatPanel = document.querySelector("#chatPanel");
@@ -63,14 +37,26 @@ export function createChat(currentUser, registeredUsers = []) {
   const messageList = document.querySelector("#messageList");
   const messageInput = document.querySelector("#messageInput");
   const sendButton = document.querySelector("#sendButton");
+  const chatFeedback = document.querySelector("#chatFeedback");
 
   function conversationFor(userId) {
-    if (!conversations[userId]) conversations[userId] = [];
-    return conversations[userId];
+    if (!conversations.has(userId)) conversations.set(userId, []);
+    return conversations.get(userId);
   }
 
-  function saveConversations() {
-    localStorage.setItem(storageKey, JSON.stringify(conversations));
+  function showFeedback(message, type = "danger") {
+    chatFeedback.className = `alert alert-${type} mb-3`;
+    chatFeedback.textContent = message;
+  }
+
+  function clearFeedback() {
+    chatFeedback.className = "alert d-none mb-3";
+    chatFeedback.textContent = "";
+  }
+
+  function conversationPath(userId) {
+    const [uidA, uidB] = [currentUser.uid, userId].sort();
+    return `conversations/${uidA}/${uidB}/messages`;
   }
 
   function animateMessage(element, delay = 0) {
@@ -133,7 +119,7 @@ export function createChat(currentUser, registeredUsers = []) {
       const preview = document.createElement("small");
       preview.className = "d-block text-secondary text-truncate mt-1";
       preview.textContent = lastMessage
-        ? `${lastMessage.senderId === "me" ? "You: " : ""}${lastMessage.text}`
+        ? `${lastMessage.senderId === currentUser.uid ? "You: " : ""}${lastMessage.text}`
         : "Start a conversation";
 
       details.append(topLine, preview);
@@ -145,7 +131,7 @@ export function createChat(currentUser, registeredUsers = []) {
     if (!visibleUsers.length) {
       const empty = document.createElement("p");
       empty.className = "text-secondary small text-center mt-3";
-      empty.textContent = "No users found.";
+      empty.textContent = users.length ? "No users found." : "No other registered users yet.";
       userList.append(empty);
     }
   }
@@ -156,7 +142,7 @@ export function createChat(currentUser, registeredUsers = []) {
     document.querySelector("#emptyChat").classList.toggle("d-none", conversation.length > 0);
 
     conversation.forEach((message, index) => {
-      const sent = message.senderId === "me";
+      const sent = message.senderId === currentUser.uid;
       const row = document.createElement("div");
       row.className = `d-flex ${sent ? "justify-content-end" : "justify-content-start"} mb-3`;
 
@@ -173,7 +159,7 @@ export function createChat(currentUser, registeredUsers = []) {
 
       const time = document.createElement("small");
       time.className = `d-block text-end mt-2 ${sent ? "text-white-50" : "text-light opacity-75"}`;
-      time.textContent = message.time;
+      time.textContent = formatTime(message.timestamp);
 
       bubble.append(sender, text, time);
       row.append(bubble);
@@ -189,7 +175,9 @@ export function createChat(currentUser, registeredUsers = []) {
   function selectUser(userId, openOnMobile = false) {
     const user = users.find((item) => item.uid === userId);
     if (!user) return;
+    if (unsubscribeMessages) unsubscribeMessages();
     activeUserId = userId;
+    conversations.set(userId, []);
     renderUsers(userSearch.value);
 
     document.querySelector("#activeName").textContent = user.fullName;
@@ -199,45 +187,122 @@ export function createChat(currentUser, registeredUsers = []) {
     messageInput.disabled = false;
     sendButton.disabled = !messageInput.value.trim();
     renderMessages(user);
+    clearFeedback();
+
+    const messagesRef = ref(database, conversationPath(userId));
+    unsubscribeMessages = onChildAdded(messagesRef, (snapshot) => {
+      const message = snapshot.val();
+      if (!message || typeof message.senderId !== "string" || typeof message.text !== "string") return;
+
+      const conversation = conversationFor(userId);
+      conversation.push({
+        senderId: message.senderId,
+        text: message.text,
+        timestamp: message.timestamp
+      });
+      conversation.sort((first, second) => Number(first.timestamp) - Number(second.timestamp));
+
+      if (activeUserId === userId) {
+        renderMessages(user);
+        renderUsers(userSearch.value);
+      }
+    }, (error) => {
+      showFeedback(`Could not load messages: ${error.message}`);
+    });
 
     if (openOnMobile && window.matchMedia("(max-width: 991.98px)").matches) {
       setMobileView("chat");
     }
   }
 
-  function sendMessage(text) {
+  async function sendMessage(text) {
     const trimmed = text.trim();
-    if (!activeUserId || !trimmed) return;
-    conversationFor(activeUserId).push({
-      senderId: "me",
-      text: trimmed,
-      time: new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date())
-    });
-    saveConversations();
-    messageInput.value = "";
-    sendButton.disabled = true;
-    const user = users.find((item) => item.uid === activeUserId);
-    if (user) {
-      renderMessages(user);
-      renderUsers(userSearch.value);
+    if (!activeUserId || !trimmed || isSending) return;
+
+    const recipientId = activeUserId;
+    const restoreButton = setButtonLoading(sendButton, "Sending...");
+    isSending = true;
+    try {
+      await set(push(ref(database, conversationPath(recipientId))), {
+        senderId: currentUser.uid,
+        text: trimmed,
+        timestamp: serverTimestamp()
+      });
+      if (activeUserId === recipientId && messageInput.value.trim() === trimmed) {
+        messageInput.value = "";
+      }
+      clearFeedback();
+    } catch (error) {
+      showFeedback(`Could not send message: ${error.message}`);
+    } finally {
+      restoreButton();
+      isSending = false;
+      sendButton.disabled = !activeUserId || !messageInput.value.trim();
     }
     messageInput.focus();
   }
 
   document.querySelector("#messageForm").addEventListener("submit", (event) => {
     event.preventDefault();
-    sendMessage(messageInput.value);
+    void sendMessage(messageInput.value);
   });
 
   messageInput.addEventListener("input", () => {
-    sendButton.disabled = !activeUserId || !messageInput.value.trim();
+    sendButton.disabled = isSending || !activeUserId || !messageInput.value.trim();
   });
 
   userSearch.addEventListener("input", () => renderUsers(userSearch.value));
   document.querySelector("#backToUsers").addEventListener("click", () => setMobileView("users"));
 
-  renderUsers();
-  if (users.length) selectUser(users[0].uid);
+  onValue(ref(database, "users"), (snapshot) => {
+    const profiles = snapshot.val() || {};
+    users = Object.entries(profiles)
+      .filter(([uid, profile]) => (
+        uid !== currentUser.uid &&
+        profile &&
+        typeof profile.fullName === "string" &&
+        profile.fullName.trim()
+      ))
+      .map(([uid, profile]) => ({
+        uid,
+        fullName: profile.fullName.trim(),
+        online: profile.online === true
+      }))
+      .sort((first, second) => first.fullName.localeCompare(second.fullName));
+
+    if (activeUserId && !users.some((user) => user.uid === activeUserId)) {
+      if (unsubscribeMessages) unsubscribeMessages();
+      unsubscribeMessages = null;
+      activeUserId = null;
+      document.querySelector("#activeName").textContent = "Select a conversation";
+      document.querySelector("#activeAvatar").textContent = "?";
+      document.querySelector("#activeStatus").textContent = "Choose a user to start chatting";
+      messageInput.disabled = true;
+      sendButton.disabled = true;
+      messageList.replaceChildren();
+    }
+    renderUsers(userSearch.value);
+  }, (error) => {
+    showFeedback(`Could not load users: ${error.message}`);
+  });
+
+  update(ref(database, `users/${currentUser.uid}`), {
+    fullName: currentUser.fullName,
+    online: false
+  }).then(() => {
+    onValue(ref(database, ".info/connected"), (snapshot) => {
+      if (snapshot.val() !== true) return;
+
+      const onlineRef = ref(database, `users/${currentUser.uid}/online`);
+      onDisconnect(onlineRef).set(false)
+        .then(() => set(onlineRef, true))
+        .catch((error) => showFeedback(`Could not update online status: ${error.message}`));
+    }, (error) => {
+      showFeedback(`Could not monitor connection: ${error.message}`);
+    });
+  }).catch((error) => {
+    showFeedback(`Could not save your profile: ${error.message}`);
+  });
 
   return {
     syncResponsiveLayout,

@@ -1,0 +1,26 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['fullName', 'online']) && newData.child('fullName').isString() && newData.child('fullName').val().length <= 60 && newData.child('online').isBoolean()"
+      }
+    },
+    "conversations": {
+      "$uidA": {
+        "$uidB": {
+          "messages": {
+            ".read": "auth != null && (auth.uid === $uidA || auth.uid === $uidB)",
+            "$messageId": {
+              ".write": "auth != null && (auth.uid === $uidA || auth.uid === $uidB) && ((!data.exists() && newData.child('senderId').val() === auth.uid) || (data.child('senderId').val() === auth.uid && newData.child('senderId').val() === auth.uid))",
+              ".validate": "newData.hasChildren(['senderId', 'text', 'timestamp']) && newData.child('senderId').isString() && newData.child('text').isString() && newData.child('text').val().length <= 1000 && newData.child('timestamp').isNumber()"
+            }
+          }
+        }
+      }
+    }
+  }
+}
