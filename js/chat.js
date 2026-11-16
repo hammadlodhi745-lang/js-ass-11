@@ -1,15 +1,15 @@
 import {
-  onChildAdded,
   onDisconnect,
   onValue,
   push,
+  remove,
   ref,
   serverTimestamp,
   set,
   update
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-database.js";
-import { setButtonLoading } from "./button-loading.js";
 import { database } from "./firebase.js";
+import { setButtonLoading } from "./ui.js";
 
 function initials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "?";
@@ -28,6 +28,7 @@ export function createChat(currentUser) {
   let mobileView = "users";
   let unsubscribeMessages = null;
   let isSending = false;
+  let openMessageMenu = null;
 
   const usersPanel = document.querySelector("#usersPanel");
   const chatPanel = document.querySelector("#chatPanel");
@@ -52,6 +53,17 @@ export function createChat(currentUser) {
   function clearFeedback() {
     chatFeedback.className = "alert d-none mb-3";
     chatFeedback.textContent = "";
+  }
+
+  function closeMessageMenus() {
+    if (!openMessageMenu) return;
+    const { menu, menuItems, menuToggle } = openMessageMenu;
+    menuItems.classList.remove("show");
+    menuItems.style.removeProperty("top");
+    menuItems.style.removeProperty("left");
+    menuToggle.setAttribute("aria-expanded", "false");
+    menu.append(menuItems);
+    openMessageMenu = null;
   }
 
   function conversationPath(userId) {
@@ -136,8 +148,11 @@ export function createChat(currentUser) {
     }
   }
 
-  function renderMessages(user) {
+  function renderMessages(user, forceScroll = false) {
+    closeMessageMenus();
     const conversation = conversationFor(user.uid);
+    const wasAtBottom = messageArea.scrollHeight - messageArea.scrollTop - messageArea.clientHeight < 80;
+    const shouldScrollToBottom = forceScroll || wasAtBottom;
     messageList.replaceChildren();
     document.querySelector("#emptyChat").classList.toggle("d-none", conversation.length > 0);
 
@@ -147,11 +162,120 @@ export function createChat(currentUser) {
       row.className = `d-flex ${sent ? "justify-content-end" : "justify-content-start"} mb-3`;
 
       const bubble = document.createElement("div");
-      bubble.className = `rounded-4 p-3 w-75 ${sent ? "bg-primary text-white" : "bg-body-secondary text-light"}`;
+      bubble.className = `message-bubble rounded-4 p-3 w-75 ${sent ? "bg-primary text-white" : "bg-body-secondary text-light"}`;
 
       const sender = document.createElement("small");
-      sender.className = `d-block fw-semibold mb-1 ${sent ? "text-white-50" : "text-light"}`;
+      sender.className = `fw-semibold ${sent ? "text-white-50" : "text-light"}`;
       sender.textContent = sent ? "You" : user.fullName;
+
+      const menu = document.createElement("div");
+      menu.className = "dropdown";
+      const menuToggle = document.createElement("button");
+      menuToggle.type = "button";
+      menuToggle.className = "btn btn-sm message-action-toggle";
+      menuToggle.setAttribute("aria-label", "Message options");
+      menuToggle.setAttribute("aria-haspopup", "true");
+      menuToggle.setAttribute("aria-expanded", "false");
+      menuToggle.setAttribute("data-message-menu-toggle", "");
+      menuToggle.innerHTML = '<i class="bi bi-three-dots-vertical"></i>';
+
+      const menuItems = document.createElement("div");
+      menuItems.className = "dropdown-menu dropdown-menu-end message-action-menu";
+      menuToggle.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const wasOpen = openMessageMenu && openMessageMenu.menuItems === menuItems;
+        closeMessageMenus();
+        if (!wasOpen) {
+          document.body.append(menuItems);
+          menuItems.style.top = "0px";
+          menuItems.style.left = "0px";
+          menuItems.classList.add("show");
+          const buttonRect = menuToggle.getBoundingClientRect();
+          const menuWidth = menuItems.offsetWidth;
+          const menuHeight = menuItems.offsetHeight;
+          const spaceBelow = window.innerHeight - buttonRect.bottom;
+          const spaceAbove = buttonRect.top;
+          const openBelow = spaceBelow >= menuHeight + 8 || spaceBelow >= spaceAbove;
+          const maxTop = Math.max(8, window.innerHeight - menuHeight - 8);
+          const top = openBelow
+            ? Math.min(buttonRect.bottom + 4, maxTop)
+            : Math.max(8, Math.min(buttonRect.top - menuHeight - 4, maxTop));
+          const left = Math.max(
+            8,
+            Math.min(buttonRect.right - menuWidth, window.innerWidth - menuWidth - 8)
+          );
+          menuItems.style.top = `${top}px`;
+          menuItems.style.left = `${left}px`;
+          menuToggle.setAttribute("aria-expanded", "true");
+          openMessageMenu = { menu, menuItems, menuToggle };
+        }
+      });
+
+      function addMenuItem(label, iconName, action, itemClass = "") {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = `dropdown-item ${itemClass}`.trim();
+        const icon = document.createElement("i");
+        icon.className = `bi ${iconName} me-2`;
+        icon.setAttribute("aria-hidden", "true");
+        item.append(icon, document.createTextNode(label));
+        item.addEventListener("click", (event) => {
+          event.stopPropagation();
+          closeMessageMenus();
+          void action();
+        });
+        menuItems.append(item);
+      }
+
+      if (sent) {
+        addMenuItem("Edit", "bi-pencil", async () => {
+          const updatedText = window.prompt("Edit message:", message.text);
+          if (updatedText === null) return;
+
+          const trimmed = updatedText.trim();
+          if (!trimmed) {
+            showFeedback("Message cannot be empty.");
+            return;
+          }
+          if (trimmed.length > 1000) {
+            showFeedback("Message must be 1000 characters or fewer.");
+            return;
+          }
+
+          try {
+            await update(ref(database, `${conversationPath(user.uid)}/${message.id}`), {
+              text: trimmed,
+              editedAt: serverTimestamp()
+            });
+            clearFeedback();
+          } catch (error) {
+            showFeedback(`Could not edit message: ${error.message}`);
+          }
+        });
+        addMenuItem("Delete", "bi-trash3", async () => {
+          if (!window.confirm("Delete this message?")) return;
+          try {
+            await remove(ref(database, `${conversationPath(user.uid)}/${message.id}`));
+            clearFeedback();
+          } catch (error) {
+            showFeedback(`Could not delete message: ${error.message}`);
+          }
+        }, "message-delete-action");
+      }
+
+      addMenuItem("Copy", "bi-clipboard", async () => {
+        try {
+          await navigator.clipboard.writeText(message.text);
+          showFeedback("Message copied.", "success");
+        } catch (error) {
+          showFeedback(`Could not copy message: ${error.message}`);
+        }
+      });
+      menu.append(menuToggle, menuItems);
+
+      const messageHeader = document.createElement("div");
+      messageHeader.className = "d-flex align-items-start justify-content-between gap-2 mb-1";
+      messageHeader.append(sender, menu);
 
       const text = document.createElement("div");
       text.className = "text-break";
@@ -159,17 +283,19 @@ export function createChat(currentUser) {
 
       const time = document.createElement("small");
       time.className = `d-block text-end mt-2 ${sent ? "text-white-50" : "text-light opacity-75"}`;
-      time.textContent = formatTime(message.timestamp);
+      time.textContent = `${formatTime(message.timestamp)}${message.editedAt ? " (edited)" : ""}`;
 
-      bubble.append(sender, text, time);
+      bubble.append(messageHeader, text, time);
       row.append(bubble);
       messageList.append(row);
       animateMessage(row, Math.min(index * 30, 120));
     });
 
-    requestAnimationFrame(() => {
-      messageArea.scrollTop = messageArea.scrollHeight;
-    });
+    if (shouldScrollToBottom) {
+      requestAnimationFrame(() => {
+        messageArea.scrollTop = messageArea.scrollHeight;
+      });
+    }
   }
 
   function selectUser(userId, openOnMobile = false) {
@@ -186,21 +312,22 @@ export function createChat(currentUser) {
     document.querySelector("#activeStatus").className = `small mb-0 ${user.online ? "text-success" : "text-secondary"}`;
     messageInput.disabled = false;
     sendButton.disabled = !messageInput.value.trim();
-    renderMessages(user);
+    renderMessages(user, true);
     clearFeedback();
 
     const messagesRef = ref(database, conversationPath(userId));
-    unsubscribeMessages = onChildAdded(messagesRef, (snapshot) => {
-      const message = snapshot.val();
-      if (!message || typeof message.senderId !== "string" || typeof message.text !== "string") return;
-
-      const conversation = conversationFor(userId);
-      conversation.push({
-        senderId: message.senderId,
-        text: message.text,
-        timestamp: message.timestamp
-      });
-      conversation.sort((first, second) => Number(first.timestamp) - Number(second.timestamp));
+    unsubscribeMessages = onValue(messagesRef, (snapshot) => {
+      const records = snapshot.val() || {};
+      const conversation = Object.entries(records)
+        .filter(([, message]) => (
+          message &&
+          typeof message.senderId === "string" &&
+          typeof message.text === "string" &&
+          typeof message.timestamp === "number"
+        ))
+        .map(([id, message]) => ({ id, ...message }))
+        .sort((first, second) => first.timestamp - second.timestamp);
+      conversations.set(userId, conversation);
 
       if (activeUserId === userId) {
         renderMessages(user);
@@ -253,6 +380,9 @@ export function createChat(currentUser) {
 
   userSearch.addEventListener("input", () => renderUsers(userSearch.value));
   document.querySelector("#backToUsers").addEventListener("click", () => setMobileView("users"));
+  document.addEventListener("click", closeMessageMenus);
+  messageArea.addEventListener("scroll", closeMessageMenus, { passive: true });
+  window.addEventListener("resize", closeMessageMenus);
 
   onValue(ref(database, "users"), (snapshot) => {
     const profiles = snapshot.val() || {};

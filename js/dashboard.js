@@ -1,8 +1,7 @@
 import { createChat } from "./chat.js";
-import { setButtonLoading } from "./button-loading.js";
-import { initializePageMotion } from "./motion.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import { auth } from "./firebase.js";
+import { initializePageMotion, setButtonLoading } from "./ui.js";
 
 initializePageMotion();
 

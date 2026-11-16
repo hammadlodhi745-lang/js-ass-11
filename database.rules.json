@@ -15,7 +15,7 @@
           "messages": {
             ".read": "auth != null && (auth.uid === $uidA || auth.uid === $uidB)",
             "$messageId": {
-              ".write": "auth != null && (auth.uid === $uidA || auth.uid === $uidB) && ((!data.exists() && newData.child('senderId').val() === auth.uid) || (data.child('senderId').val() === auth.uid && newData.child('senderId').val() === auth.uid))",
+              ".write": "auth != null && (auth.uid === $uidA || auth.uid === $uidB) && ((!data.exists() && newData.child('senderId').val() === auth.uid) || (data.exists() && data.child('senderId').val() === auth.uid && (!newData.exists() || newData.child('senderId').val() === auth.uid)))",
               ".validate": "newData.hasChildren(['senderId', 'text', 'timestamp']) && newData.child('senderId').isString() && newData.child('text').isString() && newData.child('text').val().length <= 1000 && newData.child('timestamp').isNumber()"
             }
           }

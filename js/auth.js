@@ -1,11 +1,10 @@
-import { initializePageMotion } from "./motion.js";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
-import { setButtonLoading } from "./button-loading.js";
 import { auth } from "./firebase.js";
+import { initializePageMotion, setButtonLoading } from "./ui.js";
 
 initializePageMotion();
 
