@@ -1,4 +1,5 @@
 import { createChat } from "./chat.js";
+import { setButtonLoading } from "./button-loading.js";
 import { initializePageMotion } from "./motion.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import { auth } from "./firebase.js";
@@ -27,11 +28,20 @@ onAuthStateChanged(auth, (user) => {
   const chat = createChat(currentUser);
   window.addEventListener("resize", chat.syncResponsiveLayout);
 
-  document.querySelector("#logoutButton").addEventListener("click", async () => {
+  const logoutButton = document.querySelector("#logoutButton");
+  let isLoggingOut = false;
+
+  logoutButton.addEventListener("click", async () => {
+    if (isLoggingOut) return;
+    isLoggingOut = true;
+    const restoreButton = setButtonLoading(logoutButton, "Logging out...");
+
     try {
       await signOut(auth);
       window.location.href = "index.html";
     } catch (error) {
+      restoreButton();
+      isLoggingOut = false;
       window.alert(`Could not log out: ${error.message}`);
     }
   });

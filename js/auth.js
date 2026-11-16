@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   updateProfile
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
+import { setButtonLoading } from "./button-loading.js";
 import { auth } from "./firebase.js";
 
 initializePageMotion();
@@ -17,6 +18,9 @@ function showFeedback(message, type = "danger") {
 
 const loginForm = document.querySelector("#loginForm");
 if (loginForm) {
+  const submitButton = loginForm.querySelector('button[type="submit"]');
+  let isSubmitting = false;
+
   const notice = sessionStorage.getItem("chatly.notice");
   if (notice) {
     showFeedback(notice, "success");
@@ -25,15 +29,19 @@ if (loginForm) {
 
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!loginForm.reportValidity()) return;
+    if (isSubmitting || !loginForm.reportValidity()) return;
 
     const email = document.querySelector("#loginEmail").value.trim().toLowerCase();
     const password = document.querySelector("#loginPassword").value;
+    isSubmitting = true;
+    const restoreButton = setButtonLoading(submitButton, "Logging in...");
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
       window.location.href = "dashboard.html";
     } catch (error) {
+      restoreButton();
+      isSubmitting = false;
       showFeedback(error.message);
     }
   });
@@ -41,8 +49,10 @@ if (loginForm) {
 
 const signupForm = document.querySelector("#signupForm");
 if (signupForm) {
+  const submitButton = signupForm.querySelector('button[type="submit"]');
   const passwordInput = document.querySelector("#signupPassword");
   const confirmInput = document.querySelector("#confirmPassword");
+  let isSubmitting = false;
 
   function validatePasswordMatch() {
     confirmInput.setCustomValidity(
@@ -58,7 +68,7 @@ if (signupForm) {
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     validatePasswordMatch();
-    if (!signupForm.reportValidity()) return;
+    if (isSubmitting || !signupForm.reportValidity()) return;
 
     const fullName = document.querySelector("#fullName").value.trim();
     const email = document.querySelector("#signupEmail").value.trim().toLowerCase();
@@ -67,6 +77,9 @@ if (signupForm) {
       showFeedback("Please enter your full name.");
       return;
     }
+
+    isSubmitting = true;
+    const restoreButton = setButtonLoading(submitButton, "Creating account...");
 
     try {
       const { user } = await createUserWithEmailAndPassword(
@@ -77,6 +90,8 @@ if (signupForm) {
       await updateProfile(user, { displayName: fullName });
       window.location.href = "dashboard.html";
     } catch (error) {
+      restoreButton();
+      isSubmitting = false;
       showFeedback(error.message);
     }
   });
