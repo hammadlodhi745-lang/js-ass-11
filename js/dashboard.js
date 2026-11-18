@@ -12,7 +12,7 @@ onAuthStateChanged(auth, (user) => {
   }
 
   const fullName = user.displayName || user.email?.split("@")[0] || "Chatly User";
-  const currentUser = { uid: user.uid, id: user.uid, fullName, email: user.email };
+  const currentUser = { uid: user.uid, fullName, email: user.email };
   const profileName = document.querySelector("#profileName");
   const profileAvatar = document.querySelector("#profileAvatar");
 
