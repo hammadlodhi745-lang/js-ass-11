@@ -111,7 +111,8 @@ export function createChat(currentUser) {
       const status = document.createElement("span");
       status.className = `badge rounded-pill ${user.online ? "text-bg-success" : "bg-body-secondary text-light"}`;
       status.textContent = user.online ? "Online" : "Offline";
-      topLine.append(name, status);
+      topLine.appendChild(name);
+      topLine.appendChild(status);
 
       const conversation = conversationFor(user.uid);
       const lastMessage = conversation[conversation.length - 1];
@@ -121,17 +122,19 @@ export function createChat(currentUser) {
         ? `${lastMessage.senderId === currentUser.uid ? "You: " : ""}${lastMessage.text}`
         : "Start a conversation";
 
-      details.append(topLine, preview);
-      button.append(avatar, details);
+      details.appendChild(topLine);
+      details.appendChild(preview);
+      button.appendChild(avatar);
+      button.appendChild(details);
       button.addEventListener("click", () => selectUser(user.uid, true));
-      userList.append(button);
+      userList.appendChild(button);
     });
 
     if (!visibleUsers.length) {
       const empty = document.createElement("p");
       empty.className = "text-secondary small text-center mt-3";
       empty.textContent = users.length ? "No users found." : "No other registered users yet.";
-      userList.append(empty);
+      userList.appendChild(empty);
     }
   }
 
@@ -156,7 +159,7 @@ export function createChat(currentUser) {
 
       const messageHeader = document.createElement("div");
       messageHeader.className = "d-flex align-items-start justify-content-between gap-2 mb-1";
-      messageHeader.append(sender);
+      messageHeader.appendChild(sender);
 
       const text = document.createElement("div");
       text.className = "text-break";
@@ -166,9 +169,11 @@ export function createChat(currentUser) {
       time.className = `d-block text-end mt-2 ${sent ? "text-white-50" : "text-light opacity-75"}`;
       time.textContent = `${formatTime(message.timestamp)}${message.editedAt ? " (edited)" : ""}`;
 
-      bubble.append(messageHeader, text, time);
-      row.append(bubble);
-      messageList.append(row);
+      bubble.appendChild(messageHeader);
+      bubble.appendChild(text);
+      bubble.appendChild(time);
+      row.appendChild(bubble);
+      messageList.appendChild(row);
       animateMessage(row, Math.min(index * 30, 120));
     });
 
