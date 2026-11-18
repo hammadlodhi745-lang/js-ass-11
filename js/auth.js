@@ -69,11 +69,11 @@ if (signupForm) {
     validatePasswordMatch();
     if (isSubmitting || !signupForm.reportValidity()) return;
 
-    const fullName = document.querySelector("#fullName").value.trim();
+    const username = document.querySelector("#username").value.trim();
     const email = document.querySelector("#signupEmail").value.trim().toLowerCase();
 
-    if (!fullName) {
-      showFeedback("Please enter your full name.");
+    if (!username) {
+      showFeedback("Please enter your username.");
       return;
     }
 
@@ -86,7 +86,7 @@ if (signupForm) {
         email,
         passwordInput.value
       );
-      await updateProfile(user, { displayName: fullName });
+      await updateProfile(user, { displayName: username });
       window.location.href = "dashboard.html";
     } catch (error) {
       restoreButton();
