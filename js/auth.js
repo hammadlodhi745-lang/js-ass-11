@@ -3,7 +3,8 @@ import {
   signInWithEmailAndPassword,
   updateProfile
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
-import { auth } from "./firebase.js";
+import { ref, set } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-database.js";
+import { auth, database } from "./firebase.js";
 import { initializePageMotion, setButtonLoading } from "./ui.js";
 
 initializePageMotion();
@@ -71,9 +72,19 @@ if (signupForm) {
 
     const fullName = document.querySelector("#fullName").value.trim();
     const email = document.querySelector("#signupEmail").value.trim().toLowerCase();
+    const username = document.querySelector("#username").value.trim().replace(/^@+/, "");
+    const phoneNumber = document.querySelector("#phoneNumber").value.trim();
 
     if (!fullName) {
       showFeedback("Please enter your full name.");
+      return;
+    }
+    if (!username) {
+      showFeedback("Please enter a username.");
+      return;
+    }
+    if (!phoneNumber) {
+      showFeedback("Please enter a phone number.");
       return;
     }
 
@@ -87,6 +98,14 @@ if (signupForm) {
         passwordInput.value
       );
       await updateProfile(user, { displayName: fullName });
+      await set(ref(database, `users/${user.uid}`), {
+        id: user.uid,
+        fullName,
+        username,
+        email,
+        phoneNumber,
+        online: false
+      });
       window.location.href = "dashboard.html";
     } catch (error) {
       restoreButton();

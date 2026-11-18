@@ -87,7 +87,14 @@ export function createChat(currentUser) {
 
   function renderUsers(query = "") {
     const searchTerm = query.trim().toLowerCase();
-    const visibleUsers = users.filter((user) => user.fullName.toLowerCase().includes(searchTerm));
+    const visibleUsers = users.filter((user) => [
+      user.fullName,
+      user.username,
+      user.email,
+      user.phoneNumber,
+      user.id,
+      user.uid
+    ].some((value) => String(value || "").toLowerCase().includes(searchTerm)));
     document.querySelector("#userCount").textContent = visibleUsers.length;
     userList.replaceChildren();
 
@@ -113,6 +120,10 @@ export function createChat(currentUser) {
       status.textContent = user.online ? "Online" : "Offline";
       topLine.append(name, status);
 
+      const identity = document.createElement("small");
+      identity.className = "d-block text-secondary text-truncate mt-1";
+      identity.textContent = `@${user.username || "no-username"} | ${user.email || "No email"} | ${user.phoneNumber || "No phone"} | ID: ${user.id || user.uid}`;
+
       const conversation = conversationFor(user.uid);
       const lastMessage = conversation[conversation.length - 1];
       const preview = document.createElement("small");
@@ -121,7 +132,7 @@ export function createChat(currentUser) {
         ? `${lastMessage.senderId === currentUser.uid ? "You: " : ""}${lastMessage.text}`
         : "Start a conversation";
 
-      details.append(topLine, preview);
+      details.append(topLine, identity, preview);
       button.append(avatar, details);
       button.addEventListener("click", () => selectUser(user.uid, true));
       userList.append(button);
@@ -274,6 +285,10 @@ export function createChat(currentUser) {
       .map(([uid, profile]) => ({
         uid,
         fullName: profile.fullName.trim(),
+        id: typeof profile.id === "string" ? profile.id : uid,
+        username: typeof profile.username === "string" ? profile.username : "",
+        email: typeof profile.email === "string" ? profile.email : "",
+        phoneNumber: typeof profile.phoneNumber === "string" ? profile.phoneNumber : "",
         online: profile.online === true
       }))
       .sort((first, second) => first.fullName.localeCompare(second.fullName));
@@ -295,7 +310,9 @@ export function createChat(currentUser) {
   });
 
   update(ref(database, `users/${currentUser.uid}`), {
+    id: currentUser.uid,
     fullName: currentUser.fullName,
+    email: currentUser.email || "",
     online: false
   }).then(() => {
     onValue(ref(database, ".info/connected"), (snapshot) => {
